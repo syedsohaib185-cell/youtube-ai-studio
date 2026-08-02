@@ -63,7 +63,7 @@ export function extractKeywords(title: string, description: string, existingTags
   return [...new Set(prioritized)].slice(0, 10)
 }
 
-function titleCase(word: string): string {
+export function titleCase(word: string): string {
   return word.replace(/\b\w/g, (c) => c.toUpperCase())
 }
 

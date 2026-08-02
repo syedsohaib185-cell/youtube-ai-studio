@@ -3,6 +3,7 @@ import { z } from 'zod'
 import type { AppConfig } from '../config.js'
 import { isLlmConfigured } from '../config.js'
 import type { StudioDatabase } from '../db.js'
+import type { AuthenticatedRequest } from '../auth.js'
 import type { Analyzer } from '../services/ai.js'
 import { extractVideoId, YouTubeFetchError, type VideoMetadataClient } from '../services/youtube.js'
 
@@ -20,15 +21,16 @@ const addVideoSchema = z.object({
 export function createVideosRouter(deps: VideoDeps): Router {
   const router = Router()
 
-  router.get('/', (_req: Request, res: Response) => {
-    const videos = deps.db.listVideos().map((video) => ({
+  router.get('/', (req: AuthenticatedRequest, res: Response) => {
+    const userId = req.user!.id
+    const videos = deps.db.listVideos(userId).map((video) => ({
       ...video,
       hasAnalysis: deps.db.getLatestAnalysis(video.id) !== null,
     }))
     res.json({ videos })
   })
 
-  router.post('/', async (req: Request, res: Response) => {
+  router.post('/', async (req: AuthenticatedRequest, res: Response) => {
     const parsed = addVideoSchema.safeParse(req.body)
     if (!parsed.success) {
       res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Invalid request' })
@@ -43,7 +45,7 @@ export function createVideosRouter(deps: VideoDeps): Router {
 
     try {
       const draft = await deps.youtube.fetch(videoId)
-      const video = deps.db.upsertVideo(draft)
+      const video = deps.db.upsertVideo(draft, req.user!.id)
       res.status(201).json({ video })
     } catch (err) {
       if (err instanceof YouTubeFetchError) {
@@ -54,8 +56,8 @@ export function createVideosRouter(deps: VideoDeps): Router {
     }
   })
 
-  router.get('/:id', (req: Request, res: Response) => {
-    const video = deps.db.getVideo(req.params.id)
+  router.get('/:id', (req: AuthenticatedRequest, res: Response) => {
+    const video = deps.db.getVideo(req.params.id, req.user!.id)
     if (!video) {
       res.status(404).json({ error: 'Video not found' })
       return
@@ -64,8 +66,8 @@ export function createVideosRouter(deps: VideoDeps): Router {
     res.json({ video, analysis })
   })
 
-  router.delete('/:id', (req: Request, res: Response) => {
-    const deleted = deps.db.deleteVideo(req.params.id)
+  router.delete('/:id', (req: AuthenticatedRequest, res: Response) => {
+    const deleted = deps.db.deleteVideo(req.params.id, req.user!.id)
     if (!deleted) {
       res.status(404).json({ error: 'Video not found' })
       return
@@ -73,8 +75,8 @@ export function createVideosRouter(deps: VideoDeps): Router {
     res.status(204).end()
   })
 
-  router.post('/:id/analyze', async (req: Request, res: Response) => {
-    const video = deps.db.getVideo(req.params.id)
+  router.post('/:id/analyze', async (req: AuthenticatedRequest, res: Response) => {
+    const video = deps.db.getVideo(req.params.id, req.user!.id)
     if (!video) {
       res.status(404).json({ error: 'Video not found' })
       return
@@ -89,7 +91,7 @@ export function createVideosRouter(deps: VideoDeps): Router {
     }
   })
 
-  router.get('/:id/analysis', (req: Request, res: Response) => {
+  router.get('/:id/analysis', (req: AuthenticatedRequest, res: Response) => {
     const analysis = deps.db.getLatestAnalysis(req.params.id)
     if (!analysis) {
       res.status(404).json({ error: 'No analysis found for this video' })
@@ -109,6 +111,7 @@ export function createHealthRouter(config: AppConfig): Router {
       status: 'ok',
       aiProvider: isLlmConfigured(config) ? 'llm' : 'rules',
       youtubeApiConfigured: Boolean(config.youtubeApiKey),
+      authEnabled: true,
       uptimeSeconds: Math.round(process.uptime()),
     })
   })
