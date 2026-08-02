@@ -1,0 +1,30 @@
+{
+  "name": "youtube-ai-studio",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AI YouTube content studio: fetch video metadata, generate titles, descriptions, tags and summaries.",
+  "workspaces": [
+    "server",
+    "web"
+  ],
+  "scripts": {
+    "dev": "concurrently -n server,web -c blue,green \"npm:dev:server\" \"npm:dev:web\"",
+    "dev:server": "npm run dev --workspace server",
+    "dev:web": "npm run dev --workspace web",
+    "build": "npm run build --workspace server && npm run build --workspace web",
+    "typecheck": "npm run typecheck --workspace server && npm run typecheck --workspace web",
+    "lint": "eslint .",
+    "test": "npm run test --workspace server",
+    "start": "npm run start --workspace server"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.30.0",
+    "concurrently": "^9.1.2",
+    "eslint": "^9.30.0",
+    "globals": "^16.0.0",
+    "typescript-eslint": "^8.34.0"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}
